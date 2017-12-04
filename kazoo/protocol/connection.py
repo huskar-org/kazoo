@@ -146,7 +146,7 @@ class ConnectionHandler(object):
 
         self._read_sock = None
         self._write_sock = None
-        self._lock_write_sock = client.handler.lock_object()
+        self._write_sock_lock = None
 
         self._socket = None
         self._xid = None
@@ -169,6 +169,7 @@ class ConnectionHandler(object):
         """Start the connection up"""
         if self.connection_closed.is_set():
             self._read_sock, self._write_sock = self.handler.socketpair()
+            self._write_sock_lock = self.handler.lock_object()
             self.connection_closed.clear()
         if self._connection_routine:
             raise Exception("Unable to start, connection routine already "
@@ -193,6 +194,7 @@ class ConnectionHandler(object):
         self.connection_closed.set()
         ws, rs = self._write_sock, self._read_sock
         self._write_sock = self._read_sock = None
+        self._write_sock_lock = None
         if ws is not None:
             ws.close()
         if rs is not None:

@@ -510,14 +510,14 @@ class KazooClient(object):
 
         # wake the connection, guarding against a race with close()
         write_sock = self._connection._write_sock
+        write_sock_lock = self._connection._write_sock_lock
         if write_sock is None:
             async_object.set_exception(ConnectionClosedError(
                 "Connection has been closed"))
         try:
-            with self._connection._lock_write_sock:
+            with write_sock_lock:
                 write_sock.send(b'\0')
-        except BaseException as e:
-            self.logger.info('Catch an error when wake-up socketpair: %s', e)
+        except:
             async_object.set_exception(ConnectionClosedError(
                 "Connection has been closed"))
 
@@ -586,7 +586,8 @@ class KazooClient(object):
 
         self._stopped.set()
         self._queue.append((CloseInstance, None))
-        self._connection._write_sock.send(b'\0')
+        with self._connection._write_sock_lock:
+            self._connection._write_sock.send(b'\0')
         self._safe_close()
 
     def restart(self):
