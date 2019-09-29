@@ -71,16 +71,17 @@ class SequentialGeventHandler(object):
             while True:
                 try:
                     func = queue.get()
-                    if func is _STOP:
-                        break
-                    func()
+                    try:
+                        if func is _STOP:
+                            break
+                        func()
+                    except Exception as exc:
+                        log.warning("Exception in worker greenlet")
+                        log.exception(exc)
+                    finally:
+                        del func  # release before possible idle
                 except self.queue_empty:
                     continue
-                except Exception as exc:
-                    log.warning("Exception in worker greenlet")
-                    log.exception(exc)
-                finally:
-                    func = None  # GC: release last reference before idle
         return gevent.spawn(greenlet_worker)
 
     def start(self):

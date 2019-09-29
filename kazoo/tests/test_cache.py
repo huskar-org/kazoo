@@ -1,4 +1,6 @@
 import gc
+import importlib
+import logging
 import uuid
 
 from mock import patch, call, Mock
@@ -11,24 +13,38 @@ from kazoo.protocol.connection import _CONNECTION_DROP
 from kazoo.recipe.cache import TreeCache, TreeNode, TreeEvent
 
 
+logger = logging.getLogger(__name__)
+
+
 class KazooAdaptiveHandlerTestCase(KazooTestHarness):
+    HANDLERS = (
+        ('kazoo.handlers.gevent', 'SequentialGeventHandler'),
+        ('kazoo.handlers.threading', 'SequentialThreadingHandler'),
+    )
+
     def setUp(self):
         self.handler = self.choose_an_installed_handler()
         self.setup_zookeeper(handler=self.handler)
 
     def tearDown(self):
+        self.handler = None
         self.teardown_zookeeper()
 
     def choose_an_installed_handler(self):
-        try:
-            from kazoo.handlers.gevent import SequentialGeventHandler
-        except ImportError:
-            pass
-        else:
-            return SequentialGeventHandler()
-
-        from kazoo.handlers.threading import SequentialThreadingHandler
-        return SequentialThreadingHandler()
+        for handler_module, handler_class in self.HANDLERS:
+            try:
+                mod = importlib.import_module(handler_module)
+                cls = getattr(mod, handler_class)
+            except ImportError:
+                continue
+            except Exception:
+                logger.warning(
+                    'The handler module %s is imported but could not be used',
+                    handler_module, exc_info=1)
+                continue
+            else:
+                return cls()
+        raise ImportError('No available handler')
 
 
 class KazooTreeCacheTests(KazooAdaptiveHandlerTestCase):
@@ -48,7 +64,6 @@ class KazooTreeCacheTests(KazooAdaptiveHandlerTestCase):
         if self.cache is not None:
             self.cache.close()
             self.cache = None
-        self.handler = None
         super(KazooTreeCacheTests, self).tearDown()
 
     def make_cache(self):
@@ -82,7 +97,7 @@ class KazooTreeCacheTests(KazooAdaptiveHandlerTestCase):
             while not self.client.handler.completion_queue.empty():
                 self.client.handler.sleep_func(0.1)
         else:
-            # Let hub of gevent/eventlet be in short-time loop
+            # Let hub of gevent/eventlet be in a short-time loop
             self.client.handler.sleep_func(0.1)
         for gen in range(3):
             gc.collect(gen)
