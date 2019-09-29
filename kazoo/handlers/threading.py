@@ -200,6 +200,7 @@ class SequentialThreadingHandler(object):
                         log.exception("Exception in worker queue thread")
                     finally:
                         queue.task_done()
+                        func = None  # GC: release last reference before idle
                 except self.queue_empty:
                     continue
         t = threading.Thread(target=thread_worker)

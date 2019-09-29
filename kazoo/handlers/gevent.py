@@ -79,6 +79,8 @@ class SequentialGeventHandler(object):
                 except Exception as exc:
                     log.warning("Exception in worker greenlet")
                     log.exception(exc)
+                finally:
+                    func = None  # GC: release last reference before idle
         return gevent.spawn(greenlet_worker)
 
     def start(self):
