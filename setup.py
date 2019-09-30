@@ -1,4 +1,4 @@
-__version__ = '2.0'
+__version__ = '2.0.post6'
 
 import os
 import sys
